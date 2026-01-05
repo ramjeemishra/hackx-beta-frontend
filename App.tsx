@@ -13,6 +13,7 @@ import Sponsors from "./components/Sponsors";
 import FAQ from "./components/FAQ";
 import Footer from "./components/Footer";
 import Register from "./components/Registration";
+import Scanner from "./components/Scanner";
 
 const Home = () => (
   <>
@@ -54,6 +55,7 @@ const App: React.FC = () => {
           <Routes location={location} key={location.pathname}>
             <Route path="/" element={<Home />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/scanner" element={<Scanner />} />
           </Routes>
         )}
       </AnimatePresence>

@@ -2,8 +2,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, Menu, X } from 'lucide-react';
+import { useNavigate } from "react-router-dom";
 
 const Navbar: React.FC = () => {
+  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const links = ['About', 'Schedule', 'Tracks', 'Prizes', 'Sponsors', 'FAQs'];
 
@@ -35,8 +37,9 @@ const Navbar: React.FC = () => {
           <Activity size={14} className="text-red-600 animate-pulse" />
           <span className="text-[10px] font-black text-red-600 uppercase tracking-widest">Live</span>
         </div>
-        <button className="px-5 md:px-6 py-2 bg-black text-white text-[11px] font-black uppercase tracking-widest rounded-sm hover:bg-red-600 transition-all">
-          Join
+        <button className="px-5 md:px-6 py-2 bg-black text-white text-[11px] font-black uppercase tracking-widest rounded-sm hover:bg-red-600 transition-all" onClick={() => navigate("/scanner")}>
+          
+          Scan QR
         </button>
         <button 
           className="lg:hidden p-2 text-zinc-600"
