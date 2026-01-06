@@ -68,9 +68,21 @@ const F1ScannerApp: React.FC = () => {
       }
 
       const teamFromDb = await res.json();
+      const teamId = teamFromDb._id;
+
+      const alreadyScanned =
+        teams.some((t) => t.teamId === teamId) ||
+        previewTeam?.teamId === teamId;
+
+      if (alreadyScanned) {
+        alert("Team already scanned");
+        scannerRef.current?.stop();
+        setStatus("READY");
+        return;
+      }
 
       const normalizedTeam: TeamScanResult = {
-        teamId: teamFromDb._id,
+        teamId,
         teamName: teamFromDb.teamName,
         leader: {
           name: teamFromDb.lead.name,
@@ -96,8 +108,10 @@ const F1ScannerApp: React.FC = () => {
     }
   };
 
-  const startCameraScan = async () => {
+  const startCameraScan = () => {
     if (!scannerRef.current) return;
+    setPreviewTeam(null);
+    setSelectedTeam(null);
     setStatus("SCANNING");
     scannerRef.current.start();
   };
