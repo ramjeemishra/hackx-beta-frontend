@@ -79,14 +79,14 @@ const Hero: React.FC = () => {
           </h1>
         </div>
 
-        <div className="inline-block px-6 py-3 bg-white/65 md:bg-white/50 backdrop-blur-md border border-white/30 rounded-xl mb-10">
+        <div className="inline-block px-6 py-3 bg-white/65 md:bg-white/50 backdrop-blur-md border border-white/30 rounded-xl mb-3">
           <h2 className="text-lg md:text-2xl lg:text-4xl font-bold uppercase tracking-widest text-zinc-600">
             Race to Innovation
           </h2>
         </div>
 
         <div className="flex flex-col items-center mb-3">
-          <div className="inline-block px-4 py-2 bg-white/70 md:bg-white/55 backdrop-blur-md border border-white/30 rounded-lg mb-4">
+          <div className="inline-block px-4 py-2 bg-white/70 md:bg-white/55 backdrop-blur-md border border-white/30 rounded-lg mb-2">
             <p className="text-[11px] font-extrabold uppercase tracking-[0.32em] text-zinc-700">
               Race Begins In
             </p>

@@ -1,24 +1,49 @@
 import React, { useEffect, useRef, useState } from "react";
 import QrScanner from "qr-scanner";
-import { Trophy, Zap, Maximize2 } from "lucide-react";
+import { Trophy, Zap, Maximize2, Crown, X } from "lucide-react";
 
-interface Attendee {
-  id: string;
-  name: string;
-  team: string;
-  role: string;
-  time: string;
-  avatar: string;
+interface TeamMember {
+  fullName: string;
+  email: string;
+  phone?: string;
 }
+
+interface Lead {
+  name: string;
+  email: string;
+  phone?: string;
+  gender?: string;
+}
+
+interface TeamScanResult {
+  teamId: string;
+  teamName: string;
+  lead: Lead;
+  members: TeamMember[];
+  totalMembers: number;
+  time: string;
+}
+
+const STORAGE_KEY = "scanned_teams";
 
 const F1ScannerApp: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const scannerRef = useRef<QrScanner | null>(null);
 
-  const [status, setStatus] = useState<"READY" | "SCANNING" | "SUCCESS">("READY");
-  const [last, setLast] = useState<Attendee | null>(null);
-  const [history, setHistory] = useState<Attendee[]>([]);
+  const [status, setStatus] = useState<"READY" | "SCANNING">("READY");
+  const [teams, setTeams] = useState<TeamScanResult[]>([]);
+  const [previewTeam, setPreviewTeam] = useState<TeamScanResult | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<TeamScanResult | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) setTeams(JSON.parse(saved));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(teams));
+  }, [teams]);
 
   useEffect(() => {
     if (!videoRef.current) return;
@@ -26,166 +51,115 @@ const F1ScannerApp: React.FC = () => {
     scannerRef.current = new QrScanner(
       videoRef.current,
       (result) => onScanSuccess(result.data),
-      {
-        preferredCamera: "environment",
-        maxScansPerSecond: 25,
-        highlightScanRegion: false,
-        highlightCodeOutline: false,
-        returnDetailedScanResult: true,
-      }
+      { preferredCamera: "environment" }
     );
 
     return () => {
       scannerRef.current?.stop();
       scannerRef.current?.destroy();
-      scannerRef.current = null;
     };
   }, []);
 
-  const onScanSuccess = (data: string) => {
+  const onScanSuccess = async (data: string) => {
     try {
-      const parsed = JSON.parse(data);
+      const { teamCode } = JSON.parse(data);
+      if (!teamCode) return;
 
-      const attendee: Attendee = {
-        id: parsed.id,
-        name: parsed.name,
-        team: parsed.team,
-        role: parsed.role || "Participant",
+      const res = await fetch(
+        `http://https://hackx-beta-backend.onrender.com/api/scanner/verify/${teamCode}`
+      );
+
+      if (!res.ok) {
+        alert("Invalid team");
+        return;
+      }
+
+      const teamFromDb = await res.json();
+
+      const team: TeamScanResult = {
+        teamId: teamFromDb._id,
+        teamName: teamFromDb.teamName,
+        lead: teamFromDb.lead,
+        members: teamFromDb.members || [],
+        totalMembers: teamFromDb.totalMembers,
         time: new Date().toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
           second: "2-digit",
         }),
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${parsed.id}`,
       };
 
-      setLast(attendee);
-      setHistory((prev) => [attendee, ...prev.slice(0, 9)]);
-      setStatus("SUCCESS");
-
-      scannerRef.current?.stop();
+      setPreviewTeam(team);
 
       setTimeout(() => {
-        setStatus("READY");
-        scannerRef.current?.start();
-      }, 2000);
-
+        setTeams((prev) => {
+          if (prev.some((t) => t.teamId === team.teamId)) return prev;
+          return [team, ...prev];
+        });
+        setPreviewTeam(null);
+      }, 2500);
     } catch {
-      setStatus("READY");
+      console.error("Invalid QR");
     }
   };
-const requestCameraPermission = async () => {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment" },
-    });
 
-    stream.getTracks().forEach(track => track.stop());
-    return true;
-  } catch (err) {
-    console.error("Camera permission denied", err);
-    return false;
-  }
-};
-
-const startCameraScan = async () => {
-  if (!scannerRef.current) return;
-
-  const allowed = await requestCameraPermission();
-  if (!allowed) {
-    alert("Camera permission is required to scan QR codes.");
-    return;
-  }
-
-  try {
+  const startCameraScan = async () => {
+    if (!scannerRef.current) return;
     setStatus("SCANNING");
-    await scannerRef.current.start();
-  } catch (err) {
-    console.error("Failed to start scanner", err);
-    setStatus("READY");
-  }
-};
-
-
+    scannerRef.current.start();
+  };
 
   const scanFromImage = async (file: File) => {
     try {
-      const result = await QrScanner.scanImage(file, {
-        returnDetailedScanResult: true,
-      });
-      onScanSuccess(result.data);
-    } catch {
-      setStatus("READY");
-    }
+      const result = await QrScanner.scanImage(file);
+      onScanSuccess(result);
+    } catch {}
   };
 
+  const activeTeam = previewTeam || selectedTeam;
+
   return (
-    <div className="min-h-screen bg-[#15151E] text-white flex flex-col p-6">
+    <div className="min-h-screen bg-[#0e0e14] text-white p-6 flex flex-col">
       <header className="flex items-center gap-4 mb-6">
-        <div className="bg-red-600 p-2 skew-x-[-12deg]">
-          <Trophy className="text-white skew-x-[12deg]" />
+        <div className="bg-red-600 p-3 skew-x-[-12deg]">
+          <Trophy className="skew-x-[12deg]" />
         </div>
-        <h1 className="text-2xl font-black italic uppercase">
-          Grand Prix <span className="text-red-600">Hackathon</span>
+        <h1 className="text-3xl font-black italic uppercase">
+          Team <span className="text-red-600">Scanner</span>
         </h1>
       </header>
 
       <main className="flex-1 flex flex-col lg:flex-row gap-6">
-        <section className="flex-1 relative bg-black/40 border border-white/10 overflow-hidden">
+        <section className="flex-1 relative bg-black/50 border border-white/10 rounded-xl overflow-hidden">
           <video
             ref={videoRef}
-            playsInline
             muted
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${status === "SCANNING" ? "opacity-100" : "opacity-0"
-              }`}
+            playsInline
+            className={`absolute inset-0 w-full h-full object-cover ${
+              status === "SCANNING" ? "opacity-100" : "opacity-0"
+            }`}
           />
 
-
-          <div className="absolute inset-0 flex items-center justify-center">
-            {status === "READY" && (
-              <div className="flex flex-col items-center text-white/30 animate-pulse">
-                <Maximize2 className="w-16 h-16 mb-4" />
-                Awaiting QR
-              </div>
-            )}
-
-            {status === "SCANNING" && (
-              <div className="text-xl font-black italic uppercase animate-pulse">
-                Scanning…
-              </div>
-            )}
-
-            {status === "SUCCESS" && last && (
-              <div className="bg-red-600 p-1 animate-pop">
-                <div className="bg-black p-6 flex gap-6">
-                  <img src={last.avatar} className="w-20 h-20" />
-                  <div>
-                    <h3 className="text-2xl font-black italic uppercase">
-                      {last.name}
-                    </h3>
-                    <p className="text-white/60 uppercase text-sm">
-                      {last.team}
-                    </p>
-                    <p className="text-xs font-mono mt-1">{last.time}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          {status === "READY" && (
+            <div className="absolute inset-0 flex items-center justify-center text-white/40">
+              <Maximize2 className="w-16 h-16 mr-3" />
+              Ready to scan
+            </div>
+          )}
         </section>
 
         <aside className="w-full lg:w-96 flex flex-col gap-4">
           <button
             onClick={startCameraScan}
-            className="py-5 bg-red-600 font-black italic uppercase active:scale-95"
+            className="py-4 bg-red-600 font-black italic uppercase rounded-xl"
           >
             <Zap className="inline mr-2" />
-            Start Camera Scan
+            Start Scan
           </button>
 
           <button
             onClick={() => fileRef.current?.click()}
-            className="py-5 bg-black border border-white/10 font-black italic uppercase"
+            className="py-4 bg-black border border-white/10 font-black italic uppercase rounded-xl"
           >
             Scan from Gallery
           </button>
@@ -195,35 +169,82 @@ const startCameraScan = async () => {
             type="file"
             accept="image/*"
             className="hidden"
-            onChange={(e) => e.target.files && scanFromImage(e.target.files[0])}
+            onChange={(e) =>
+              e.target.files && scanFromImage(e.target.files[0])
+            }
           />
 
-          <div className="flex-1 bg-black/20 border border-white/10 p-4 overflow-y-auto">
-            <h4 className="text-xs uppercase tracking-widest mb-3">
-              Scan History
-            </h4>
-            {history.map((h) => (
-              <div key={h.id} className="flex gap-3 mb-3 bg-white/5 p-2">
-                <img src={h.avatar} className="w-10 h-10" />
-                <div>
-                  <p className="font-bold text-sm uppercase">{h.name}</p>
-                  <p className="text-[10px] text-white/40 uppercase">
-                    {h.team}
-                  </p>
-                </div>
-              </div>
+          <div className="flex-1 bg-black/30 border border-white/10 rounded-xl p-4 overflow-y-auto">
+            <p className="text-xs uppercase tracking-widest mb-3">
+              Scanned Teams ({teams.length})
+            </p>
+
+            {teams.map((t) => (
+              <button
+                key={t.teamId}
+                onClick={() => setSelectedTeam(t)}
+                className="w-full text-left bg-white/5 hover:bg-white/10 p-3 mb-2 rounded"
+              >
+                <p className="font-bold uppercase">{t.teamName}</p>
+                <p className="text-xs text-white/50">
+                  {t.lead?.name} • {t.time}
+                </p>
+              </button>
             ))}
           </div>
         </aside>
       </main>
 
-      <style>{`
-        @keyframes pop {
-          from { transform: scale(0.9); opacity: 0 }
-          to { transform: scale(1); opacity: 1 }
-        }
-        .animate-pop { animation: pop 0.3s ease }
-      `}</style>
+      {activeTeam && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-6">
+          <div className="bg-[#0e0e14] border border-white/10 rounded-xl max-w-xl w-full p-6 space-y-4">
+            <div className="flex justify-between">
+              <h2 className="text-2xl font-black uppercase">
+                {activeTeam.teamName}
+              </h2>
+              {selectedTeam && (
+                <button onClick={() => setSelectedTeam(null)}>
+                  <X />
+                </button>
+              )}
+            </div>
+
+            <div>
+              <p className="text-red-500 font-bold uppercase flex items-center gap-2">
+                <Crown className="w-4 h-4" /> Leader
+              </p>
+              <p className="font-semibold">{activeTeam.lead?.name}</p>
+              <p className="text-sm text-white/60">
+                {activeTeam.lead?.email}
+              </p>
+              <p className="text-sm text-white/60">
+                {activeTeam.lead?.phone}
+              </p>
+            </div>
+
+            <div>
+              <p className="uppercase text-sm font-bold text-red-500 mb-2">
+                Members ({activeTeam.members.length})
+              </p>
+
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {activeTeam.members.map((m, i) => (
+                  <div
+                    key={i}
+                    className="flex justify-between bg-white/5 p-2 rounded"
+                  >
+                    <div>
+                      <p className="font-medium">{m.fullName}</p>
+                      <p className="text-xs text-white/50">{m.email}</p>
+                    </div>
+                    <p className="text-xs text-white/40">{m.phone}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
