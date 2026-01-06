@@ -117,7 +117,7 @@ const F1ScannerApp: React.FC = () => {
         foodStatus: teamFromDb.foodStatus,
         time: new Date().toLocaleTimeString(),
       };
-
+      scannerRef.current?.stop();
       setPreviewTeam(normalized);
       setTeams((p) => [normalized, ...p]);
     } finally {
@@ -142,7 +142,7 @@ const F1ScannerApp: React.FC = () => {
       setPresentMembers([]);
       const result = await QrScanner.scanImage(file);
       onScanSuccess(result);
-    } catch {}
+    } catch { }
   };
 
   const toggleMember = (email: string) => {
@@ -166,19 +166,25 @@ const F1ScannerApp: React.FC = () => {
     setPreviewTeam((p) => (p ? { ...p, attendance: true } : p));
   };
 
-  const submitFood = async () => {
-    if (!previewTeam || !mealType) return;
+const submitFood = async () => {
+  const team = previewTeam || selectedTeam;
+  if (!team) return;
 
-    await fetch(`${API_BASE}/scanner/food`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        teamCode: previewTeam.teamCode,
-        mealType,
-        members: presentMembers,
-      }),
-    });
-  };
+  await fetch(`${API_BASE}/scanner/food`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      teamCode: team.teamCode,
+      mealType,
+      members: presentMembers,
+    }),
+  });
+
+  setPreviewTeam(null);
+  setSelectedTeam(null);
+  setPresentMembers([]);
+};
+
 
   const activeTeam = previewTeam || selectedTeam;
   const attendanceCompleted =
@@ -199,17 +205,15 @@ const F1ScannerApp: React.FC = () => {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setMode("ATTENDANCE")}
-            className={`px-4 py-2 rounded ${
-              mode === "ATTENDANCE" ? "bg-red-600" : "bg-white/10"
-            }`}
+            className={`px-4 py-2 rounded ${mode === "ATTENDANCE" ? "bg-red-600" : "bg-white/10"
+              }`}
           >
             Attendance
           </button>
           <button
             onClick={() => setMode("FOOD")}
-            className={`px-4 py-2 rounded ${
-              mode === "FOOD" ? "bg-red-600" : "bg-white/10"
-            }`}
+            className={`px-4 py-2 rounded ${mode === "FOOD" ? "bg-red-600" : "bg-white/10"
+              }`}
           >
             Food
           </button>
@@ -222,9 +226,8 @@ const F1ScannerApp: React.FC = () => {
             ref={videoRef}
             muted
             playsInline
-            className={`absolute inset-0 w-full h-full object-cover ${
-              status === "SCANNING" ? "opacity-100" : "opacity-0"
-            }`}
+            className={`absolute inset-0 w-full h-full object-cover ${status === "SCANNING" ? "opacity-100" : "opacity-0"
+              }`}
           />
           {status === "READY" && (
             <div className="absolute inset-0 flex items-center justify-center text-white/40">
@@ -435,6 +438,7 @@ const F1ScannerApp: React.FC = () => {
 
             <button
               onClick={submitFood}
+              disabled={!mealType}
               className="w-full bg-red-600 py-3 rounded font-bold"
             >
               Submit
