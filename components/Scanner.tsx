@@ -1,15 +1,17 @@
 import React, { useEffect, useRef, useState } from "react";
 import QrScanner from "qr-scanner";
-import { Trophy, Zap, Maximize2, Crown, X } from "lucide-react";
+import { Trophy, Zap, Maximize2, Crown, X, CheckCircle } from "lucide-react";
 
 interface TeamMember {
   name: string;
   email: string;
   phone?: string;
+  present?: boolean;
 }
 
 interface TeamScanResult {
   teamId: string;
+  teamCode: string;
   teamName: string;
   leader: TeamMember & { gender?: string };
   members: TeamMember[];
@@ -18,18 +20,22 @@ interface TeamScanResult {
 }
 
 const STORAGE_KEY = "scanned_teams";
+const API_BASE = "https://hackx-beta-backend.onrender.com/api";
+// const API_BASE = "http://localhost:5000/api";
 
 const F1ScannerApp: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const scannerRef = useRef<QrScanner | null>(null);
-
   const isProcessingRef = useRef(false);
 
   const [status, setStatus] = useState<"READY" | "SCANNING">("READY");
   const [teams, setTeams] = useState<TeamScanResult[]>([]);
   const [previewTeam, setPreviewTeam] = useState<TeamScanResult | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<TeamScanResult | null>(null);
+
+  const [presentMembers, setPresentMembers] = useState<string[]>([]);
+  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -61,43 +67,30 @@ const F1ScannerApp: React.FC = () => {
 
     try {
       const parsed = JSON.parse(data);
-      if (!parsed.teamCode) {
-        isProcessingRef.current = false;
-        return;
-      }
+      if (!parsed.teamCode) return;
 
       const existing = JSON.parse(
         localStorage.getItem(STORAGE_KEY) || "[]"
       ) as TeamScanResult[];
 
-      const alreadyExists = existing.find(
-        (t) => t.teamId === parsed.teamCode
-      );
-
-      if (alreadyExists) {
+      if (existing.some((t) => t.teamCode === parsed.teamCode)) {
         alert("Team already scanned");
-        scannerRef.current?.stop();
-        setStatus("READY");
-        isProcessingRef.current = false;
         return;
       }
 
       const res = await fetch(
-        `https://hackx-beta-backend.onrender.com/api/scanner/verify/${parsed.teamCode}`
+        `${API_BASE}/scanner/verify/${parsed.teamCode}`
       );
-
       if (!res.ok) {
         alert("Invalid team");
-        scannerRef.current?.stop();
-        setStatus("READY");
-        isProcessingRef.current = false;
         return;
       }
 
       const teamFromDb = await res.json();
 
-      const normalizedTeam: TeamScanResult = {
-        teamId: teamFromDb.teamCode,
+      const normalized: TeamScanResult = {
+        teamId: teamFromDb._id,
+        teamCode: teamFromDb.teamCode,
         teamName: teamFromDb.teamName,
         leader: {
           name: teamFromDb.lead.name,
@@ -109,33 +102,29 @@ const F1ScannerApp: React.FC = () => {
           name: m.fullName,
           email: m.email,
           phone: m.phone,
+          present: m.present ?? false,
         })),
         totalMembers: teamFromDb.totalMembers,
         time: new Date().toLocaleTimeString(),
       };
 
-      setPreviewTeam(normalizedTeam);
-      setTeams((prev) => [normalizedTeam, ...prev]);
-
-      scannerRef.current?.stop();
-      setStatus("READY");
-    } catch {
-      alert("Invalid QR");
-      scannerRef.current?.stop();
-      setStatus("READY");
+      setPreviewTeam(normalized);
+      setTeams((p) => [normalized, ...p]);
+      setPresentMembers([]);
+      setSubmitted(false);
     } finally {
-      setTimeout(() => {
-        isProcessingRef.current = false;
-      }, 500);
+      scannerRef.current?.stop();
+      setStatus("READY");
+      setTimeout(() => (isProcessingRef.current = false), 400);
     }
   };
 
   const startCameraScan = () => {
     if (!scannerRef.current) return;
-    isProcessingRef.current = false;
     setPreviewTeam(null);
     setSelectedTeam(null);
     setStatus("SCANNING");
+    isProcessingRef.current = false;
     scannerRef.current.start();
   };
 
@@ -144,6 +133,38 @@ const F1ScannerApp: React.FC = () => {
       const result = await QrScanner.scanImage(file);
       onScanSuccess(result);
     } catch {}
+  };
+
+  const toggleMember = (email: string) => {
+    setPresentMembers((p) =>
+      p.includes(email) ? p.filter((e) => e !== email) : [...p, email]
+    );
+  };
+
+  const submitAttendance = async () => {
+    if (!previewTeam) return;
+
+    await fetch(`${API_BASE}/scanner/member-attendance`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        teamCode: previewTeam.teamCode,
+        presentMembers,
+      }),
+    });
+
+    setSubmitted(true);
+  };
+
+  const markAllPresent = async () => {
+    if (!previewTeam) return;
+
+    await fetch(
+      `${API_BASE}/scanner/mark-all-present/${previewTeam.teamCode}`,
+      { method: "PATCH" }
+    );
+
+    setSubmitted(true);
   };
 
   const activeTeam = previewTeam || selectedTeam;
@@ -159,6 +180,7 @@ const F1ScannerApp: React.FC = () => {
         </h1>
       </header>
 
+      {/* MAIN CONTENT RESTORED */}
       <main className="flex-1 flex flex-col lg:flex-row gap-6">
         <section className="flex-1 relative bg-black/50 border border-white/10 rounded-xl overflow-hidden">
           <video
@@ -169,7 +191,6 @@ const F1ScannerApp: React.FC = () => {
               status === "SCANNING" ? "opacity-100" : "opacity-0"
             }`}
           />
-
           {status === "READY" && (
             <div className="absolute inset-0 flex items-center justify-center text-white/40">
               <Maximize2 className="w-16 h-16 mr-3" />
@@ -183,8 +204,7 @@ const F1ScannerApp: React.FC = () => {
             onClick={startCameraScan}
             className="py-4 bg-red-600 font-black italic uppercase rounded-xl"
           >
-            <Zap className="inline mr-2" />
-            Start Scan
+            <Zap className="inline mr-2" /> Start Scan
           </button>
 
           <button
@@ -225,46 +245,71 @@ const F1ScannerApp: React.FC = () => {
         </aside>
       </main>
 
+      {/* POPUP */}
       {activeTeam && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-6">
-          <div className="bg-[#0e0e14] border border-white/10 rounded-xl max-w-xl w-full p-6 space-y-4">
-            <div className="flex justify-between">
+          <div className="bg-[#0e0e14] max-w-xl w-full p-6 rounded-xl border border-white/10 animate-[fadeIn_0.3s_ease-out]">
+            <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-black uppercase">
                 {activeTeam.teamName}
               </h2>
-              <button
-                onClick={() => {
-                  setPreviewTeam(null);
-                  setSelectedTeam(null);
-                }}
-              >
+              <button onClick={() => setPreviewTeam(null)}>
                 <X />
               </button>
             </div>
 
-            <div>
-              <p className="text-red-500 font-bold uppercase flex items-center gap-2">
-                <Crown className="w-4 h-4" /> Leader
+            <div className="bg-white/5 p-3 rounded mb-4">
+              <p className="text-red-500 font-bold flex items-center gap-2">
+                <Crown size={16} /> Leader
               </p>
-              <p className="font-bold">{activeTeam.leader.name}</p>
-              <p className="text-xs text-white/50">{activeTeam.leader.email}</p>
-              <p className="text-xs text-white/50">{activeTeam.leader.phone}</p>
+              <p className="font-semibold">{activeTeam.leader.name}</p>
+              <p className="text-xs text-white/60">{activeTeam.leader.email}</p>
+              <p className="text-xs text-white/60">{activeTeam.leader.phone}</p>
             </div>
 
-            <div>
-              <p className="uppercase text-sm font-bold text-red-500 mb-2">
-                Members ({activeTeam.members.length})
-              </p>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {activeTeam.members.map((m, i) => (
-                  <div key={i} className="bg-white/5 p-2 rounded">
+            <div className="space-y-2 max-h-64 overflow-y-auto mb-4">
+              {activeTeam.members.map((m, i) => (
+                <div
+                  key={i}
+                  className="bg-white/5 p-3 rounded flex justify-between items-center"
+                >
+                  <div>
                     <p className="font-semibold">{m.name}</p>
-                    <p className="text-xs text-white/50">{m.email}</p>
-                    <p className="text-xs text-white/50">{m.phone}</p>
+                    <p className="text-xs text-white/60">{m.email}</p>
+                    <p className="text-xs text-white/60">{m.phone}</p>
                   </div>
-                ))}
-              </div>
+
+                  {!submitted && (
+                    <input
+                      type="checkbox"
+                      checked={presentMembers.includes(m.email)}
+                      onChange={() => toggleMember(m.email)}
+                    />
+                  )}
+                </div>
+              ))}
             </div>
+
+            {!submitted ? (
+              <div className="flex gap-3">
+                <button
+                  onClick={submitAttendance}
+                  className="flex-1 bg-red-600 py-3 rounded font-bold"
+                >
+                  Submit
+                </button>
+                <button
+                  onClick={markAllPresent}
+                  className="flex-1 bg-black border border-white/20 py-3 rounded font-bold"
+                >
+                  Mark All Present
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-2 text-green-400 font-bold">
+                <CheckCircle /> Attendance Submitted
+              </div>
+            )}
           </div>
         </div>
       )}
