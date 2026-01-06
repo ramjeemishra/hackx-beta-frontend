@@ -37,7 +37,6 @@ interface TeamScanResult {
 
 const STORAGE_KEY = "scanned_teams";
 const API_BASE = "https://hackx-beta-backend.onrender.com/api";
-// const API_BASE = "http://localhost:5000/api";
 
 const F1ScannerApp: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -53,7 +52,6 @@ const F1ScannerApp: React.FC = () => {
   const [teams, setTeams] = useState<TeamScanResult[]>([]);
   const [previewTeam, setPreviewTeam] = useState<TeamScanResult | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<TeamScanResult | null>(null);
-
   const [presentMembers, setPresentMembers] = useState<string[]>([]);
 
   useEffect(() => {
@@ -187,19 +185,18 @@ const F1ScannerApp: React.FC = () => {
     mode === "ATTENDANCE" && activeTeam?.attendance === true;
 
   return (
-    <div className="min-h-screen bg-[#0e0e14] text-white p-6 flex flex-col">
-      {/* HEADER */}
-      <header className="flex items-center justify-between mb-6">
+    <div className="min-h-screen bg-[#0e0e14] text-white p-4 sm:p-6 flex flex-col">
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div className="flex items-center gap-4">
           <div className="bg-red-600 p-3 skew-x-[-12deg]">
             <Trophy className="skew-x-[12deg]" />
           </div>
-          <h1 className="text-3xl font-black italic uppercase">
+          <h1 className="text-2xl sm:text-3xl font-black italic uppercase">
             Team <span className="text-red-600">Scanner</span>
           </h1>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setMode("ATTENDANCE")}
             className={`px-4 py-2 rounded ${
@@ -219,9 +216,8 @@ const F1ScannerApp: React.FC = () => {
         </div>
       </header>
 
-      {/* MAIN */}
       <main className="flex-1 flex flex-col lg:flex-row gap-6">
-        <section className="flex-1 relative bg-black/50 border border-white/10 rounded-xl overflow-hidden">
+        <section className="relative bg-black/50 border border-white/10 rounded-xl overflow-hidden min-h-[260px] lg:flex-1">
           <video
             ref={videoRef}
             muted
@@ -232,7 +228,7 @@ const F1ScannerApp: React.FC = () => {
           />
           {status === "READY" && (
             <div className="absolute inset-0 flex items-center justify-center text-white/40">
-              <Maximize2 className="w-16 h-16 mr-3" />
+              <Maximize2 className="w-12 h-12 mr-3" />
               Ready to scan
             </div>
           )}
@@ -276,7 +272,7 @@ const F1ScannerApp: React.FC = () => {
             }
           />
 
-          <div className="flex-1 bg-black/30 border border-white/10 rounded-xl p-4 overflow-y-auto">
+          <div className="flex-1 bg-black/30 border border-white/10 rounded-xl p-4 overflow-y-auto max-h-[40vh] lg:max-h-none">
             <p className="text-xs uppercase tracking-widest mb-3">
               Scanned Teams ({teams.length})
             </p>
@@ -297,13 +293,12 @@ const F1ScannerApp: React.FC = () => {
         </aside>
       </main>
 
-      {/* ATTENDANCE POPUP */}
       {activeTeam && mode === "ATTENDANCE" && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-6">
-          <div className="bg-[#111118] max-w-3xl w-full rounded-2xl border border-white/10 overflow-hidden">
-            <div className="p-6 border-b border-white/10 flex justify-between">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#111118] w-full max-w-3xl rounded-2xl border border-white/10">
+            <div className="p-4 sm:p-6 border-b border-white/10 flex justify-between">
               <div>
-                <h2 className="text-3xl font-black uppercase">
+                <h2 className="text-xl sm:text-3xl font-black uppercase">
                   {activeTeam.teamName}
                 </h2>
                 <p className="text-white/60 flex items-center gap-2 mt-1">
@@ -320,7 +315,7 @@ const F1ScannerApp: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-6 grid md:grid-cols-2 gap-6">
+            <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-black/40 p-4 rounded-xl border border-white/10">
                 <p className="text-red-500 font-bold flex items-center gap-2 mb-3">
                   <Crown size={16} /> Team Leader
@@ -339,7 +334,7 @@ const F1ScannerApp: React.FC = () => {
                   <Users size={16} /> Members
                 </p>
 
-                <div className="space-y-3 max-h-64 overflow-y-auto">
+                <div className="space-y-3 max-h-[50vh] overflow-y-auto">
                   {activeTeam.members.map((m) => (
                     <div
                       key={m.email}
@@ -369,7 +364,7 @@ const F1ScannerApp: React.FC = () => {
             </div>
 
             {!attendanceCompleted && (
-              <div className="p-6 border-t border-white/10">
+              <div className="p-4 sm:p-6 border-t border-white/10">
                 <button
                   onClick={submitAttendance}
                   className="w-full bg-red-600 py-4 rounded-xl font-black uppercase"
@@ -382,13 +377,12 @@ const F1ScannerApp: React.FC = () => {
         </div>
       )}
 
-      {/* FOOD POPUP */}
       {activeTeam && mode === "FOOD" && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-6">
-          <div className="bg-[#0e0e14] max-w-xl w-full p-6 rounded-xl border border-white/10">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#0e0e14] w-full max-w-xl p-4 sm:p-6 rounded-xl border border-white/10">
             <div className="flex justify-between items-start mb-4">
               <div>
-                <h2 className="text-2xl font-black uppercase">
+                <h2 className="text-xl sm:text-2xl font-black uppercase">
                   {activeTeam.teamName}
                 </h2>
                 <p className="text-sm text-white/60">
@@ -410,7 +404,7 @@ const F1ScannerApp: React.FC = () => {
               </button>
             </div>
 
-            <div className="space-y-2 max-h-64 overflow-y-auto mb-4">
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto mb-4">
               {activeTeam.members.map((m) => {
                 const alreadyFed =
                   mealType &&
