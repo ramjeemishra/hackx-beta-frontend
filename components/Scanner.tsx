@@ -24,6 +24,8 @@ const F1ScannerApp: React.FC = () => {
   const fileRef = useRef<HTMLInputElement>(null);
   const scannerRef = useRef<QrScanner | null>(null);
 
+  const isProcessingRef = useRef(false);
+
   const [status, setStatus] = useState<"READY" | "SCANNING">("READY");
   const [teams, setTeams] = useState<TeamScanResult[]>([]);
   const [previewTeam, setPreviewTeam] = useState<TeamScanResult | null>(null);
@@ -54,9 +56,31 @@ const F1ScannerApp: React.FC = () => {
   }, []);
 
   const onScanSuccess = async (data: string) => {
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
+
     try {
       const parsed = JSON.parse(data);
-      if (!parsed.teamCode) return;
+      if (!parsed.teamCode) {
+        isProcessingRef.current = false;
+        return;
+      }
+
+      const existing = JSON.parse(
+        localStorage.getItem(STORAGE_KEY) || "[]"
+      ) as TeamScanResult[];
+
+      const alreadyExists = existing.find(
+        (t) => t.teamId === parsed.teamCode
+      );
+
+      if (alreadyExists) {
+        alert("Team already scanned");
+        scannerRef.current?.stop();
+        setStatus("READY");
+        isProcessingRef.current = false;
+        return;
+      }
 
       const res = await fetch(
         `https://hackx-beta-backend.onrender.com/api/scanner/verify/${parsed.teamCode}`
@@ -64,25 +88,16 @@ const F1ScannerApp: React.FC = () => {
 
       if (!res.ok) {
         alert("Invalid team");
+        scannerRef.current?.stop();
+        setStatus("READY");
+        isProcessingRef.current = false;
         return;
       }
 
       const teamFromDb = await res.json();
-      const teamId = teamFromDb._id;
-
-      const alreadyScanned =
-        teams.some((t) => t.teamId === teamId) ||
-        previewTeam?.teamId === teamId;
-
-      if (alreadyScanned) {
-        alert("Team already scanned");
-        scannerRef.current?.stop();
-        setStatus("READY");
-        return;
-      }
 
       const normalizedTeam: TeamScanResult = {
-        teamId,
+        teamId: teamFromDb.teamCode,
         teamName: teamFromDb.teamName,
         leader: {
           name: teamFromDb.lead.name,
@@ -101,15 +116,23 @@ const F1ScannerApp: React.FC = () => {
 
       setPreviewTeam(normalizedTeam);
       setTeams((prev) => [normalizedTeam, ...prev]);
+
       scannerRef.current?.stop();
       setStatus("READY");
     } catch {
-      console.error("Invalid QR");
+      alert("Invalid QR");
+      scannerRef.current?.stop();
+      setStatus("READY");
+    } finally {
+      setTimeout(() => {
+        isProcessingRef.current = false;
+      }, 500);
     }
   };
 
   const startCameraScan = () => {
     if (!scannerRef.current) return;
+    isProcessingRef.current = false;
     setPreviewTeam(null);
     setSelectedTeam(null);
     setStatus("SCANNING");
