@@ -3,22 +3,15 @@ import QrScanner from "qr-scanner";
 import { Trophy, Zap, Maximize2, Crown, X } from "lucide-react";
 
 interface TeamMember {
-  fullName: string;
-  email: string;
-  phone?: string;
-}
-
-interface Lead {
   name: string;
   email: string;
   phone?: string;
-  gender?: string;
 }
 
 interface TeamScanResult {
   teamId: string;
   teamName: string;
-  lead: Lead;
+  leader: TeamMember & { gender?: string };
   members: TeamMember[];
   totalMembers: number;
   time: string;
@@ -62,11 +55,11 @@ const F1ScannerApp: React.FC = () => {
 
   const onScanSuccess = async (data: string) => {
     try {
-      const { teamCode } = JSON.parse(data);
-      if (!teamCode) return;
+      const parsed = JSON.parse(data);
+      if (!parsed.teamCode) return;
 
       const res = await fetch(
-        `http://https://hackx-beta-backend.onrender.com/api/scanner/verify/${teamCode}`
+        `https://hackx-beta-backend.onrender.com/api/scanner/verify/${parsed.teamCode}`
       );
 
       if (!res.ok) {
@@ -76,28 +69,28 @@ const F1ScannerApp: React.FC = () => {
 
       const teamFromDb = await res.json();
 
-      const team: TeamScanResult = {
+      const normalizedTeam: TeamScanResult = {
         teamId: teamFromDb._id,
         teamName: teamFromDb.teamName,
-        lead: teamFromDb.lead,
-        members: teamFromDb.members || [],
+        leader: {
+          name: teamFromDb.lead.name,
+          email: teamFromDb.lead.email,
+          phone: teamFromDb.lead.phone,
+          gender: teamFromDb.lead.gender,
+        },
+        members: teamFromDb.members.map((m: any) => ({
+          name: m.fullName,
+          email: m.email,
+          phone: m.phone,
+        })),
         totalMembers: teamFromDb.totalMembers,
-        time: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        }),
+        time: new Date().toLocaleTimeString(),
       };
 
-      setPreviewTeam(team);
-
-      setTimeout(() => {
-        setTeams((prev) => {
-          if (prev.some((t) => t.teamId === team.teamId)) return prev;
-          return [team, ...prev];
-        });
-        setPreviewTeam(null);
-      }, 2500);
+      setPreviewTeam(normalizedTeam);
+      setTeams((prev) => [normalizedTeam, ...prev]);
+      scannerRef.current?.stop();
+      setStatus("READY");
     } catch {
       console.error("Invalid QR");
     }
@@ -187,7 +180,7 @@ const F1ScannerApp: React.FC = () => {
               >
                 <p className="font-bold uppercase">{t.teamName}</p>
                 <p className="text-xs text-white/50">
-                  {t.lead?.name} • {t.time}
+                  {t.leader.name} • {t.time}
                 </p>
               </button>
             ))}
@@ -202,42 +195,35 @@ const F1ScannerApp: React.FC = () => {
               <h2 className="text-2xl font-black uppercase">
                 {activeTeam.teamName}
               </h2>
-              {selectedTeam && (
-                <button onClick={() => setSelectedTeam(null)}>
-                  <X />
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  setPreviewTeam(null);
+                  setSelectedTeam(null);
+                }}
+              >
+                <X />
+              </button>
             </div>
 
             <div>
               <p className="text-red-500 font-bold uppercase flex items-center gap-2">
                 <Crown className="w-4 h-4" /> Leader
               </p>
-              <p className="font-semibold">{activeTeam.lead?.name}</p>
-              <p className="text-sm text-white/60">
-                {activeTeam.lead?.email}
-              </p>
-              <p className="text-sm text-white/60">
-                {activeTeam.lead?.phone}
-              </p>
+              <p className="font-bold">{activeTeam.leader.name}</p>
+              <p className="text-xs text-white/50">{activeTeam.leader.email}</p>
+              <p className="text-xs text-white/50">{activeTeam.leader.phone}</p>
             </div>
 
             <div>
               <p className="uppercase text-sm font-bold text-red-500 mb-2">
                 Members ({activeTeam.members.length})
               </p>
-
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 {activeTeam.members.map((m, i) => (
-                  <div
-                    key={i}
-                    className="flex justify-between bg-white/5 p-2 rounded"
-                  >
-                    <div>
-                      <p className="font-medium">{m.fullName}</p>
-                      <p className="text-xs text-white/50">{m.email}</p>
-                    </div>
-                    <p className="text-xs text-white/40">{m.phone}</p>
+                  <div key={i} className="bg-white/5 p-2 rounded">
+                    <p className="font-semibold">{m.name}</p>
+                    <p className="text-xs text-white/50">{m.email}</p>
+                    <p className="text-xs text-white/50">{m.phone}</p>
                   </div>
                 ))}
               </div>

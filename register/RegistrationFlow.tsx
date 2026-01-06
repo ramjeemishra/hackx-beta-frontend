@@ -29,7 +29,7 @@ const handleStep2Submit = async (members: TeamMember[]) => {
   const payload = { ...formData, members };
 
   try {
-    await fetch("https://hackx-beta-backend.onrender.com/api/register", {
+    await fetch("https://hackx-beta-backend.onrender.com", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
