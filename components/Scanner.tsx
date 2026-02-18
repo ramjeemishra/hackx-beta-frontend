@@ -124,6 +124,42 @@ const F1ScannerApp: React.FC = () => {
       setTimeout(() => (isProcessingRef.current = false), 300);
     }
   };
+  const refetchTeam = async (teamCode: string) => {
+    console.log("reloading data for", teamCode);
+    const res = await fetch(`${API_BASE}/scanner/verify/${teamCode}`);
+    if (!res.ok) return;
+
+    const teamFromDb = await res.json();
+
+    const normalized: TeamScanResult = {
+      teamId: teamFromDb._id,
+      teamCode: teamFromDb.teamCode,
+      teamName: teamFromDb.teamName,
+      leader: {
+        name: teamFromDb.lead.name,
+        email: teamFromDb.lead.email,
+        phone: teamFromDb.lead.phone,
+      },
+      members: teamFromDb.members.map((m: any) => ({
+        name: m.fullName,
+        email: m.email,
+        phone: m.phone,
+        present: m.present,
+      })),
+      totalMembers: teamFromDb.totalMembers,
+      attendance: teamFromDb.attendance,
+      foodStatus: teamFromDb.foodStatus,
+      time: new Date().toLocaleTimeString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      }),
+    };
+
+    setSelectedTeam(normalized);
+  };
 
   const startCameraScan = () => {
     setPreviewTeam(null);
@@ -281,7 +317,7 @@ const F1ScannerApp: React.FC = () => {
             {teams.map((t) => (
               <button
                 key={t.teamId}
-                onClick={() => setSelectedTeam(t)}
+                onClick={() => refetchTeam(t.teamCode)}
                 className="w-full text-left bg-white/5 hover:bg-white/10 p-3 mb-2 rounded"
               >
                 <p className="font-bold uppercase">{t.teamName}</p>
