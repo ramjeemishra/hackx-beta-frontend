@@ -1,22 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import QrScanner from "qr-scanner";
-import {
-  Trophy,
-  Zap,
-  Maximize2,
-  Crown,
-  X,
-  CheckCircle,
-  Mail,
-  Phone,
-  Users,
-  Hash,
-} from "lucide-react";
+import { Trophy, Zap, Maximize2, Crown, X, CheckCircle, Mail, Phone, Users, Hash, } from "lucide-react";
 
 interface TeamMember {
   name: string;
   email: string;
   phone?: string;
+  present?: boolean;
 }
 
 interface TeamScanResult {
@@ -111,11 +101,19 @@ const F1ScannerApp: React.FC = () => {
           name: m.fullName,
           email: m.email,
           phone: m.phone,
+          present: m.present,
         })),
         totalMembers: teamFromDb.totalMembers,
         attendance: teamFromDb.attendance,
         foodStatus: teamFromDb.foodStatus,
-        time: new Date().toLocaleTimeString(),
+        time: new Date().toLocaleTimeString("en-IN", {
+          timeZone: "Asia/Kolkata",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: true,
+        }),
+
       };
       scannerRef.current?.stop();
       setPreviewTeam(normalized);
@@ -166,24 +164,24 @@ const F1ScannerApp: React.FC = () => {
     setPreviewTeam((p) => (p ? { ...p, attendance: true } : p));
   };
 
-const submitFood = async () => {
-  const team = previewTeam || selectedTeam;
-  if (!team) return;
+  const submitFood = async () => {
+    const team = previewTeam || selectedTeam;
+    if (!team) return;
 
-  await fetch(`${API_BASE}/scanner/food`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      teamCode: team.teamCode,
-      mealType,
-      members: presentMembers,
-    }),
-  });
+    await fetch(`${API_BASE}/scanner/food`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        teamCode: team.teamCode,
+        mealType,
+        members: presentMembers,
+      }),
+    });
 
-  setPreviewTeam(null);
-  setSelectedTeam(null);
-  setPresentMembers([]);
-};
+    setPreviewTeam(null);
+    setSelectedTeam(null);
+    setPresentMembers([]);
+  };
 
 
   const activeTeam = previewTeam || selectedTeam;
@@ -341,7 +339,7 @@ const submitFood = async () => {
                   {activeTeam.members.map((m) => (
                     <div
                       key={m.email}
-                      className="flex justify-between items-center bg-white/5 p-3 rounded-lg"
+                      className="bg-white/5 p-3 rounded-lg flex justify-between items-center"
                     >
                       <div>
                         <p className="font-semibold">{m.name}</p>
@@ -349,9 +347,13 @@ const submitFood = async () => {
                         <p className="text-xs text-white/60">{m.phone}</p>
                       </div>
 
-                      {attendanceCompleted ? (
+                      {m.present === true ? (
                         <span className="text-green-400 text-xs font-bold flex items-center gap-1">
-                          <CheckCircle size={14} /> Completed
+                          <CheckCircle size={14} /> Present
+                        </span>
+                      ) : m.present === false ? (
+                        <span className="text-red-400 text-xs font-bold flex items-center gap-1">
+                          <X size={14} /> Absent
                         </span>
                       ) : (
                         <input
@@ -364,6 +366,7 @@ const submitFood = async () => {
                   ))}
                 </div>
               </div>
+
             </div>
 
             {!attendanceCompleted && (
@@ -427,9 +430,13 @@ const submitFood = async () => {
                     ) : (
                       <input
                         type="checkbox"
-                        checked={presentMembers.includes(m.email)}
+                        checked={
+                          alreadyFed || presentMembers.includes(m.email)
+                        }
+                        disabled={alreadyFed}
                         onChange={() => toggleMember(m.email)}
                       />
+
                     )}
                   </div>
                 );
