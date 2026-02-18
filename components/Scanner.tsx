@@ -43,6 +43,12 @@ const F1ScannerApp: React.FC = () => {
   const [previewTeam, setPreviewTeam] = useState<TeamScanResult | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<TeamScanResult | null>(null);
   const [presentMembers, setPresentMembers] = useState<string[]>([]);
+  const [attendanceEditMode, setAttendanceEditMode] = useState(false);
+
+  useEffect(() => {
+    setAttendanceEditMode(false);
+  }, [previewTeam, selectedTeam]);
+
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -186,19 +192,23 @@ const F1ScannerApp: React.FC = () => {
   };
 
   const submitAttendance = async () => {
-    if (!previewTeam) return;
+    const team = previewTeam || selectedTeam;
+    if (!team) return;
 
     await fetch(`${API_BASE}/scanner/member-attendance`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        teamCode: previewTeam.teamCode,
+        teamCode: team.teamCode,
         presentMembers,
       }),
     });
 
-    setPreviewTeam((p) => (p ? { ...p, attendance: true } : p));
+    setAttendanceEditMode(false);
+    setPresentMembers([]);
+    await refetchTeam(team.teamCode);
   };
+
 
   const submitFood = async () => {
     const team = previewTeam || selectedTeam;
@@ -367,45 +377,70 @@ const F1ScannerApp: React.FC = () => {
               </div>
 
               <div className="bg-black/40 p-4 rounded-xl border border-white/10">
-                <p className="font-bold flex items-center gap-2 mb-3">
-                  <Users size={16} /> Members
-                </p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="font-bold flex items-center gap-2">
+                    <Users size={16} /> Members
+                  </p>
+
+                  {activeTeam.attendance && !attendanceEditMode && (
+                    <button
+                      onClick={() => {
+                        setAttendanceEditMode(true);
+                        setPresentMembers(
+                          activeTeam.members
+                            .filter(m => m.present)
+                            .map(m => m.email)
+                        );
+                      }}
+                      className="text-xs px-3 py-1 bg-yellow-600 rounded font-bold"
+                    >
+                      Update
+                    </button>
+                  )}
+                </div>
+
 
                 <div className="space-y-3 max-h-[50vh] overflow-y-auto">
-                  {activeTeam.members.map((m) => (
-                    <div
-                      key={m.email}
-                      className="bg-white/5 p-3 rounded-lg flex justify-between items-center"
-                    >
-                      <div>
-                        <p className="font-semibold">{m.name}</p>
-                        <p className="text-xs text-white/60">{m.email}</p>
-                        <p className="text-xs text-white/60">{m.phone}</p>
-                      </div>
+                  {activeTeam.members.map((m) => {
+                    const showCheckbox =
+                      attendanceEditMode || !activeTeam.attendance;
 
-                      {m.present === true ? (
-                        <span className="text-green-400 text-xs font-bold flex items-center gap-1">
-                          <CheckCircle size={14} /> Present
-                        </span>
-                      ) : m.present === false ? (
-                        <span className="text-red-400 text-xs font-bold flex items-center gap-1">
-                          <X size={14} /> Absent
-                        </span>
-                      ) : (
-                        <input
-                          type="checkbox"
-                          checked={presentMembers.includes(m.email)}
-                          onChange={() => toggleMember(m.email)}
-                        />
-                      )}
-                    </div>
-                  ))}
+                    return (
+                      <div
+                        key={m.email}
+                        className="bg-white/5 p-3 rounded-lg flex justify-between items-center"
+                      >
+                        <div>
+                          <p className="font-semibold">{m.name}</p>
+                          <p className="text-xs text-white/60">{m.email}</p>
+                          <p className="text-xs text-white/60">{m.phone}</p>
+                        </div>
+
+                        {showCheckbox ? (
+                          <input
+                            type="checkbox"
+                            checked={presentMembers.includes(m.email)}
+                            onChange={() => toggleMember(m.email)}
+                          />
+                        ) : m.present ? (
+                          <span className="text-green-400 text-xs font-bold flex items-center gap-1">
+                            <CheckCircle size={14} /> Present
+                          </span>
+                        ) : (
+                          <span className="text-red-400 text-xs font-bold flex items-center gap-1">
+                            <X size={14} /> Absent
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
+
               </div>
 
             </div>
 
-            {!attendanceCompleted && (
+            {!(attendanceEditMode || !activeTeam.attendance) && (
               <div className="p-4 sm:p-6 border-t border-white/10">
                 <button
                   onClick={submitAttendance}
