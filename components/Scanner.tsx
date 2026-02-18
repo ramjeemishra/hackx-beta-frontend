@@ -440,7 +440,7 @@ const F1ScannerApp: React.FC = () => {
 
             </div>
 
-            {!(attendanceEditMode || !activeTeam.attendance) && (
+            {activeTeam && (attendanceEditMode || !activeTeam.attendance) && (
               <div className="p-4 sm:p-6 border-t border-white/10">
                 <button
                   onClick={submitAttendance}
