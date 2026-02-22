@@ -30,8 +30,36 @@ const Home = () => (
 );
 
 const App: React.FC = () => {
+  const APP_ID = "hackx-website";
+
   const [loading, setLoading] = useState(true);
+  const [locked, setLocked] = useState(false);
+  const [checking, setChecking] = useState(true);
+
   const location = useLocation();
+
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const res = await fetch(
+          `https://admin-panel-hackx-backend.onrender.com/api/super/status?appId=${APP_ID}&t=${Date.now()}`
+        );
+
+        const data = await res.json();
+
+        setLocked(data.allowed === false || data.forceLogout === true);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setChecking(false);
+      }
+    };
+
+    checkStatus();
+    const interval = setInterval(checkStatus, 1500);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     document.body.style.overflow = loading ? "hidden" : "unset";
@@ -43,6 +71,16 @@ const App: React.FC = () => {
     }, 5500);
     return () => clearTimeout(timer);
   }, []);
+
+  if (checking) return null;
+
+  if (locked) {
+    return (
+      <div className="h-screen flex items-center justify-center text-3xl font-bold">
+        🔒 Website Locked
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full bg-white selection:bg-red-600 selection:text-white">
