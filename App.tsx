@@ -13,6 +13,7 @@ import FAQ from "./components/FAQ";
 import Footer from "./components/Footer";
 import Register from "./components/Registration";
 import Scanner from "./components/Scanner";
+import LockScreen from "./screens/LockScreen";
 
 const Home = () => (
   <>
@@ -74,13 +75,8 @@ const App: React.FC = () => {
 
   if (checking) return null;
 
-  if (locked) {
-    return (
-      <div className="h-screen flex items-center justify-center text-3xl font-bold">
-        🔒 Website Locked
-      </div>
-    );
-  }
+  if (locked) return <LockScreen />;
+
 
   return (
     <div className="relative w-full bg-white selection:bg-red-600 selection:text-white">
