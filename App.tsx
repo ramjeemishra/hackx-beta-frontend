@@ -32,6 +32,7 @@ const Home = () => (
 
 const App: React.FC = () => {
   const APP_ID = "hackx-website";
+  const BACKEND_URL = "https://admin-panel-hackx-backend.onrender.com";
 
   const [loading, setLoading] = useState(true);
   const [locked, setLocked] = useState(false);
@@ -40,26 +41,66 @@ const App: React.FC = () => {
   const location = useLocation();
 
   useEffect(() => {
-    const checkStatus = async () => {
+    let socket: WebSocket | null = null;
+
+    const fetchInitialStatus = async () => {
       try {
         const res = await fetch(
-          `https://admin-panel-hackx-backend.onrender.com/api/super/status?appId=${APP_ID}&t=${Date.now()}`
+          `${BACKEND_URL}/api/super/status?appId=${APP_ID}`
         );
 
         const data = await res.json();
-
-        setLocked(data.allowed === false || data.forceLogout === true);
+        setLocked(data.allowed === false);
       } catch (err) {
-        console.error(err);
+        console.error("Initial status error:", err);
       } finally {
         setChecking(false);
       }
     };
 
-    checkStatus();
-    const interval = setInterval(checkStatus, 1500);
+    const connectWebSocket = async () => {
+      try {
+        const res = await fetch(
+          `${BACKEND_URL}/api/super/ws-token?appId=${APP_ID}`
+        );
 
-    return () => clearInterval(interval);
+        const { token } = await res.json();
+
+        socket = new WebSocket(
+          `wss://admin-panel-hackx-backend.onrender.com?token=${token}`
+        );
+
+        socket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+
+            if (data.appId === APP_ID) {
+              setLocked(data.status === false);
+            }
+          } catch (err) {
+            console.error("WebSocket message error:", err);
+          }
+        };
+
+        socket.onerror = (err) => {
+          console.error("WebSocket error:", err);
+        };
+
+        socket.onclose = () => {
+          console.warn("WebSocket closed. Reconnecting in 3s...");
+          setTimeout(connectWebSocket, 3000);
+        };
+      } catch (err) {
+        console.error("WebSocket connection error:", err);
+      }
+    };
+
+    fetchInitialStatus();
+    connectWebSocket();
+
+    return () => {
+      if (socket) socket.close();
+    };
   }, []);
 
   useEffect(() => {
@@ -76,7 +117,6 @@ const App: React.FC = () => {
   if (checking) return null;
 
   if (locked) return <LockScreen />;
-
 
   return (
     <div className="relative w-full bg-white selection:bg-red-600 selection:text-white">
