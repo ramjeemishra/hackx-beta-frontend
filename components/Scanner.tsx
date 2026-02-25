@@ -19,6 +19,7 @@ interface TeamScanResult {
   time: string;
   attendance?: boolean;
   foodStatus?: {
+    HIGH_TEA: string[];
     BREAKFAST: string[];
     LUNCH: string[];
     DINNER: string[];
@@ -36,7 +37,7 @@ const F1ScannerApp: React.FC = () => {
 
   const [mode, setMode] = useState<"ATTENDANCE" | "FOOD">("ATTENDANCE");
   const [mealType, setMealType] =
-    useState<"BREAKFAST" | "LUNCH" | "DINNER" | "">("");
+    useState< "HIGH TEA" |"BREAKFAST" | "LUNCH" | "DINNER" | "">("");
 
   const [status, setStatus] = useState<"READY" | "SCANNING">("READY");
   const [teams, setTeams] = useState<TeamScanResult[]>([]);
@@ -289,6 +290,7 @@ const F1ScannerApp: React.FC = () => {
               className="w-full bg-black border border-white/10 rounded-xl px-4 py-3"
             >
               <option value="">Select Meal</option>
+              <option value="HIGH_TEA">High Tea</option>
               <option value="BREAKFAST">Breakfast</option>
               <option value="LUNCH">Lunch</option>
               <option value="DINNER">Dinner</option>
@@ -482,7 +484,7 @@ const F1ScannerApp: React.FC = () => {
             </div>
 
             <div className="space-y-2 max-h-[50vh] overflow-y-auto mb-4">
-              {activeTeam.members.map((m) => {
+              {[activeTeam.leader, ...activeTeam.members].map((m) => {
                 const alreadyFed =
                   mealType &&
                   activeTeam.foodStatus?.[mealType]?.includes(m.email);
